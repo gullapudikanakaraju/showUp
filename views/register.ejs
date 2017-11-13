@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>showUp</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <style>
+        body
+        {
+            background-color: #2b3137;
+        }
+    </style>
+</head>
+<body>
+    <center>
+       <h1 style="color: #999966;font-family: Verdana;font-size: 60px;margin-top: 6%"><b>showUp</b></h1>
+    </center>
+    <div class="container">
+        <div class="col-sm-3"></div>
+        <div class="col-sm-6">
+            <div class="panel" style="border-radius: 0px">
+                <div class="panel-heading" style="text-align: center;font-family:Verdana,sans-serif;background-color: #d6d6c2">Register</div>
+                <div class="panel-body">
+                    <form style="padding: 10px 50px;letter-spacing: 0.5px;font-family:Verdana,sans-serif" action="/register" method="post">
+                        <% if(message != undefined){ %>
+                            <p style="color: red"><%= message %></p>
+                        <% } %>
+                        <label for="user_name">Username :</label>
+                        <div class="input-group">  
+                            <input id="user_name" type="text" class="form-control" name="user_name" style="border-radius: 0px" autofocus="on" autocomplete="off" required="required">
+                            <span class="input-group-addon"><i class="glyphicon glyphicon-user"></i></span>
+                        </div><br>
+                        <label for="password">Password :</label>
+                        <div class="input-group">     
+                            <input id="password" type="password" class="form-control" name="password" style="border-radius: 0px" autocomplete="off" required="required">
+                            <span class="input-group-addon"><i class="glyphicon glyphicon-lock"></i></span>
+                        </div><br>
+                        <label for="retype_password">Retype Password :</label>
+                        <div class="input-group">     
+                            <input id="retype_password" type="password" class="form-control" name="retype_password" style="border-radius: 0px" autocomplete="off" required="required">
+                            <span class="input-group-addon"><i class="glyphicon glyphicon-lock"></i></span>
+                        </div><br>
+                        <button type="submit" class="btn btn-default" style="float: right;border-radius: 0px">Submit</button>
+                        <a href="/" style="text-decoration: none;"><p>Had Account? Click Here</p></a>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3"></div>
+    </div>
+</body>
+</html>
