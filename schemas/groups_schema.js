@@ -1,17 +1,21 @@
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
-var con = mongoose.createConnection('localhost:27017/showup');
+var connec = require('../config/db.js');
+
 var groups_schema = new Schema({
-	_id :{
-        type : Number,
-        required : true,
-        unique : true,
-        trim : true
-	},
     group_name :{
     	type: String,
     	required: true,
-    	trim : true
+    	trim : true,
+        unique: true
+    },
+    city :{
+        type: String,
+        required: true
+    },
+    locality :{
+        type: String,
+        required: true
     },
     messages :{
         type : [{
@@ -40,17 +44,7 @@ var groups_schema = new Schema({
     },
     members :{
         type : [{
-            _id :{
-                type : Number,
-                required : true,
-                trim : true
-            },
             member_name :{
-                type : String,
-                required : true,
-                trim : true
-            },
-            joined_on :{
                 type : String,
                 required : true,
                 trim : true
@@ -64,19 +58,12 @@ var groups_schema = new Schema({
         trim : true
     },
     created_on :{
-        type : String,
-        required : true,
-        trim : true
+        type : Date,
+        default: new Date()
     }
 }); 
 
-con.on('error',function(error){
-	console.log("error occurred while connecting to the database "+error);
-});
+groups_schema.index({city: 1, locality: 1}, {unique: true});
 
-con.once('open',function(){
-	console.log("connected to the database successfully !");
-});
-
-var groups_model = con.model('group', groups_schema);
+var groups_model = connec.model('group', groups_schema);
 module.exports = groups_model;

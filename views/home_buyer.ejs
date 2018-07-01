@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>B2D Chat</title>
+  <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+    <style>
+      .online_people_link, .other_groups_link, .my_groups_link
+      {
+        text-decoration: none;
+      }
+      .other_groups_link
+      {
+        text-decoration : none;
+      }
+      .my_groups_link
+      {
+        text-decoration : none;
+      }
+      .online_people_div, .other_groups_div, .my_groups_div
+      {
+        padding-top:5px;
+        padding-bottom:0px;
+        padding-left:2px;
+        border-bottom:1px solid #eaeae1;
+        border-radius:0px;
+      }
+      .online_people_p
+      {
+        color : green;
+        margin-top: -8px;
+      }
+      .message
+      {
+        padding:4px 10px;
+        border-radius:0px;
+      }
+      .my_message
+      {
+        padding:4px 10px;
+        border-radius:0px; 
+        text-align: right;
+      }
+      .pre
+      {
+        border-radius : 0px;
+      }
+    </style>
+</head>
+<body style="background-color: #2b3137">
+  <nav class="navbar navbar-default" style="border-radius:0px;margin:0px">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#myNavbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span> 
+      </button>
+      <a class="navbar-brand" href="#" style="margin-left:15px"><b>B2D Chat</b></a>
+    </div>
+    <div class="collapse navbar-collapse" id="myNavbar">
+      <ul class="nav navbar-nav navbar-right" style="margin-right:35px">
+        <li class="dropdown">
+          <a class="dropdown-toggle" data-toggle="dropdown" href="#"><span class="badge" style="margin-top: -2px" id="notification_count">0</span>&nbsp;Notifications
+          <span class="caret"></span></a>
+          <ul class="dropdown-menu" id="notification_body">
+          </ul>
+        </li>
+        <li><a href="logout"><span class="glyphicon glyphicon-log-in"></span> Logut</a></li>
+      </ul>
+    </div>
+  </div>
+  </nav>
+
+
+  <div class="container-fluid">
+    <div class="row" style="margin-top:1.5%">
+      <div class="col-sm-6">
+         <div class="panel panel-success" style="border-radius:1px;">
+              <div class="panel-heading" id="chat_heading">Welcome <%= user_name %> !</div>
+              <div class="panel-body" style="height:430px;overflow:auto" id="chat_body"></div>
+              <div class="panel-footer" style="padding-left :12px">
+                <form onsubmit='return send_message()'>
+                  <div class="form-group" style="display:inline-block;width:85%">
+                  <input type="text" class="form-control" id="message" style="border-radius:0px" autocomplete="off" autofocus="on" required="required" title="Please type a message and then press send button" placeholder="Enter a message ..." disabled="disabled">
+                  <input type="hidden" id="chat_identity">
+                </div>
+                  <button type="submit" class="btn btn-primary" style="border-radius:0px;width:13%;">Send</button>
+                </form>
+              </div>
+          </div>
+      </div>
+      <div class="col-sm-3">
+        <div class="panel-group">
+          <div class="panel panel-success" style="border-radius:1px;">
+            <div class="panel-heading"><b>My Groups</b><span style="float: right" id="status">offline</span></div>
+            <div class="panel-body" style="height:430px;overflow:auto" id="my_groups">
+              <% my_groups_names.forEach(function(my_groups){ %> 
+                <a href="#" id='<%= my_groups %>:group' style="text-decoration:none" onclick="my_group_chat(this)">
+                  <div class="my_groups_div">
+                    <p><b> <%= my_groups %></b></p>
+                  </div>
+                </a>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- create_group_modal -->
+  <div id="create_group_modal" class="modal fade" role="dialog">
+    <div class="modal-dialog">
+
+     <!-- Modal content-->
+      <div class="modal-content">
+       <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title">Create Group</h4>
+        </div>
+        <div class="modal-body">
+          <b><p id="group_status"></p></b>
+          <p>Please Enter a group name :</p>
+          <form onsubmit="return createGroup()">
+            <input type="text" class="form-control" id="group_name_modal" style="border-radius:0px" autocomplete="off" pattern="[A-Za-z0-9]{4,15}" title="Group name should contain only A to Z, a to z, 0 to 9 and @$ and min 4 , max 15 characters" required><br>
+            <button type="submit" class="btn btn-primary" style="float:right;border-radius:0px" id="create_group_button">Create</button> 
+          </form>
+          <br><br>
+        </div> 
+      </div>
+    </div>
+  </div>
+</body>
+
+<script>
+  var temp_socket;
+  $(document).ready(function(){    
+    console.log('hello');
+    var socket = io.connect('http://localhost:5555');
+    temp_socket = socket;
+
+    // to handle the connect event which will be fired after the web socket connection is established
+    socket.on('connect', function(){
+      console.log('connection established');
+      document.getElementById('status').textContent='online';
+
+      // to get people who are online
+      socket.emit('getOnlinePeople');
+
+      // to handle when a user logs in 
+      socket.on('joiningMessage', function(data){
+        if(document.getElementById(data.user_name) == null)
+        {
+          var a = document.createElement('a');
+          a.setAttribute('href', '#');
+          // a.setAttribute('class', 'online_people_link');
+          a.setAttribute('id', data.user_name);
+          a.style.textDecoration = 'none';
+          a.addEventListener('click', personal_chat);
+
+          var div = document.createElement('div');
+          div.setAttribute('class', 'online_people_div');
+
+          var p = document.createElement('p');
+          var b = document.createElement('b');
+          b.textContent = data.user_name;
+          p.appendChild(b);
+
+          var p1 = document.createElement('p');
+          p1.textContent = 'online';
+          p1.setAttribute('class', 'online_people_p');
+
+          div.appendChild(p);
+          div.appendChild(p1);
+
+          a.appendChild(div);
+          online_people.appendChild(a);
+        }
+      });
+
+      // to handle the response sent by the server when we asked it to send the people who are online
+      socket.on('onlinePeople', function(data){
+        console.log('people online are ', data);
+        var online_people = document.getElementById('online_people');
+        // online_people.innerHTML = "";
+        for(var i=0; i<data.length; i++)
+        {
+          if(document.getElementById(data[i].user_name) == null)
+          {
+            var a = document.createElement('a');
+            a.setAttribute('href', '#');
+            // a.setAttribute('class', 'online_people_link');
+            a.setAttribute('id', data[i].user_name);
+            a.style.textDecoration = 'none';
+            a.addEventListener('click', personal_chat);
+            var div = document.createElement('div');
+            div.setAttribute('class', 'online_people_div');
+
+            var p = document.createElement('p');
+            var b = document.createElement('b');
+            b.textContent = data[i].user_name;
+            p.appendChild(b);
+
+            var p1 = document.createElement('p');
+            p1.textContent = 'online';
+            p1.setAttribute('class', 'online_people_p');
+
+            div.appendChild(p);
+            div.appendChild(p1);
+
+            a.appendChild(div);
+            online_people.appendChild(a);
+          }
+        }
+      });
+    });
+
+    // to handle disconnect event which will be fired when the web socket connection is terminated or lost
+    socket.on('disconnect', function(){
+      console.log('connection lost');
+      document.getElementById('status').textContent = 'offline';
+      
+    });
+
+    // to handle leavingMessage event which will be fired when the web socket connection of some user who already logged in is lost or terminated
+    socket.on('leavingMessage', function(data){
+      var online_people = document.getElementById('online_people');
+      online_people.removeChild(document.getElementById(data.user_name));
+      console.log('successfully removed the child');
+    });
+
+    // to handle the new message which is received
+    socket.on('newPersonalMessage', function(data){
+      console.log('new personal message received is ', data);
+      var first_panel_heading = document.getElementById('chat_heading').textContent.trim();
+      var my_name = document.getElementById('my_name').textContent.trim();
+      if(data.from == first_panel_heading)
+      {
+        if(document.getElementById('no_messages_status') != null)
+          document.getElementById('no_messages_status').style.display = 'none';
+        console.log('names matched');
+        var div = document.createElement('div');
+        div.setAttribute('class', 'message');
+        var pre = document.createElement('pre');
+        pre.setAttribute('class', 'pre');
+        pre.style.border='0px';
+        div.appendChild(pre);
+            
+        var span1 = document.createElement('span');
+        span1.textContent = data.message_content;
+        pre.appendChild(span1);
+    
+        chat_body.appendChild(div);
+        chat_body.scrollTop = chat_body.scrollHeight;
+      }
+      else
+      {
+        console.log('names doesnt match');
+        var notification_count = parseInt(document.getElementById('notification_count').textContent);
+        console.log('notification count is ', notification_count);
+        notification_count++;
+        document.getElementById('notification_count').textContent = notification_count;
+        var notification_body = document.getElementById('notification_body');
+        var li = document.createElement('li');
+        li.setAttribute('class', data.from);
+        var a = document.createElement('a');
+        a.setAttribute('href', '#');
+        a.addEventListener('click', update_notification_body);
+        a.setAttribute('id', data.from+':a:personal');
+
+        var span1 = document.createElement('span');
+        var span2 = document.createElement('span');
+        var span3 = document.createElement('span');
+        span1.textContent = data.from;
+        span1.style.fontWeight = 'bold';
+        span2.textContent = ' messaged you';
+        span3.textContent = data.message_content;
+        span3.style.color = 'blue';
+        span3.style.fontWeight = 'bold';
+        a.appendChild(span1);
+        a.appendChild(span2);
+        var br = document.createElement('br');
+        a.appendChild(br);
+        a.appendChild(span3);
+
+        li.appendChild(a);
+        notification_body.appendChild(li);        
+      }
+
+    });
+
+    // to handle the response sent by the server when the user tries to create a group
+    socket.on('create_group_reply', function(data){
+      var group_status = document.getElementById('group_status');
+      if(data.success == false)
+      {
+        group_status.textContent = data.group_name + ' already exists !';
+        group_status.style.color = 'red';
+      }
+      else
+      {
+        group_status.textContent= data.group_name + ' created successfully !';
+        group_status.style.color = 'green';
+        var my_groups = document.getElementById('my_groups');
+        var a = document.createElement('a');
+        a.setAttribute('href', '#');
+        // a.setAttribute('class', 'my_groups_link');
+        a.setAttribute('id', data.group_name+':group');
+        a.style.textDecoration = 'none';
+        a.addEventListener('click', my_group_chat1);
+        var div = document.createElement('div');
+        div.setAttribute('class', 'my_groups_div');
+
+        var p = document.createElement('p');
+        var b = document.createElement('b');
+        b.textContent = data.group_name;
+        p.appendChild(b); 
+        div.appendChild(p);
+        a.appendChild(div);
+        my_groups.appendChild(a);
+      }
+    });
+
+    // to handle newGroupCreated event which will be fired when a new group is created by some other user
+    socket.on('newGroupCreated', function(data){
+      var other_groups = document.getElementById('other_groups');
+      var a = document.createElement('a');
+      a.setAttribute('href', '#');
+     // a.setAttribute('class', 'other_groups_link');
+      a.setAttribute('id', data.group_name+':group');
+      a.style.textDecoration = 'none';
+      a.addEventListener('click', other_group_chat1);
+      var div = document.createElement('div');
+      div.setAttribute('class', 'other_groups_div');
+
+      var p = document.createElement('p');
+      var b = document.createElement('b');
+      b.textContent = data.group_name;
+      p.appendChild(b); 
+      div.appendChild(p);
+      a.appendChild(div);
+      other_groups.appendChild(a);
+    });
+
+    // to handle the response sent by the server when the user requested to send the messages corressponding to the another user
+    socket.on('getMessages_reply', function(x){
+      console.log('in getMessages_reply');
+      console.log('data is ', x);
+      var message = document.getElementById('message');
+      message.removeAttribute('disabled');
+      if(x.data.length == 0)
+      {
+        var chat_body = document.getElementById('chat_body');
+        chat_body.innerHTML = "";
+        chat_body.innerHTML = "<p id='no_messages_status' style='text-align:center; margin :28%'><b>No messages ! <br>Be the first one to start the conversation ... </b></p>";
+      }
+      else
+      {
+        var chat_body = document.getElementById('chat_body');
+        chat_body.innerHTML = "";
+        var from = document.getElementById('my_name').textContent;
+        console.log('before function from is ', from);
+        for(var i=0; i<x.data.length; i++)
+        {
+          if(x.data[i].from == from)
+          {
+            console.log('from ', x.data[i].from);
+            var div = document.createElement('div');
+            div.setAttribute('class', 'my_message');
+            div.style.textAlign = 'right';
+            var pre = document.createElement('pre');
+            pre.setAttribute('class', 'pre');
+            pre.style.border='0px';
+            div.appendChild(pre);
+            
+            var span1 = document.createElement('span');
+            span1.textContent = x.data[i].message_content;
+            pre.appendChild(span1);
+    
+            chat_body.appendChild(div);
+            chat_body.scrollTop = chat_body.scrollHeight;
+          }
+          else
+          {
+            console.log('from ', x.data[i].from);
+            var div = document.createElement('div');
+            div.setAttribute('class', 'message');
+
+            var pre = document.createElement('pre');
+            pre.setAttribute('class', 'pre');
+            pre.style.border='0px';
+            div.appendChild(pre);
+            
+            var span1 = document.createElement('span');
+            span1.textContent = x.data[i].message_content;
+            pre.appendChild(span1);
+    
+            chat_body.appendChild(div);
+            chat_body.scrollTop = chat_body.scrollHeight;
+          }
+        }  
+      }
+    });
+
+    socket.on('newGroupMessage', function(x){
+      console.log('in newGroupMessage ', x);
+      var first_panel_heading = document.getElementById('chat_heading').textContent.trim();
+      var my_name = document.getElementById('my_name').textContent.trim();
+      if(first_panel_heading == x.to)
+      {
+        if(document.getElementById('no_messages_status') != null)
+          document.getElementById('no_messages_status').style.display = 'none';
+        console.log('names matched');
+        var div = document.createElement('div');
+        div.setAttribute('class', 'message');
+        var pre = document.createElement('pre');
+        pre.setAttribute('class', 'pre');
+        pre.style.border='0px';
+        div.appendChild(pre);
+
+        var b = document.createElement('b');
+       
+        var span1 = document.createElement('span');
+        span1.textContent = x.from;
+        b.appendChild(span1);
+        pre.appendChild(b);
+
+        var br = document.createElement('br');
+        pre.appendChild(br);
+
+        var span2 = document.createElement('span');
+        span2.textContent = x.message_content;
+        pre.appendChild(span2);
+    
+        chat_body.appendChild(div);
+        chat_body.scrollTop = chat_body.scrollHeight;
+      }
+      else
+      {
+        console.log('names doesnt match');
+        var notification_count = parseInt(document.getElementById('notification_count').textContent);
+        console.log('notification count is ', notification_count);
+        notification_count++;
+        document.getElementById('notification_count').textContent = notification_count;
+        var notification_body = document.getElementById('notification_body');
+        var li = document.createElement('li');
+        li.setAttribute('class', x.to);
+        var a = document.createElement('a');
+        a.setAttribute('href', '#');
+        a.addEventListener('click', update_notification_body);
+        a.setAttribute('id', x.to+':a:group');
+
+        var span1 = document.createElement('span');
+        var span2 = document.createElement('span');
+        var span3 = document.createElement('span');
+        span1.textContent = x.from;
+        span1.style.fontWeight = 'bold';
+        span2.textContent = ' sent a message in group '+x.group_name;
+        span3.textContent = x.message_content;
+        span3.style.color = 'blue';
+        span3.style.fontWeight = 'bold';
+        a.appendChild(span1);
+        a.appendChild(span2);
+        var br = document.createElement('br');
+        a.appendChild(br);
+        a.appendChild(span3);
+
+        li.appendChild(a);
+        notification_body.appendChild(li);        
+      }
+    });
+
+    socket.on('join_group_reply', function(data){
+      if(data.success == true)
+      {
+        var chat_body = document.getElementById('chat_body');
+        if(document.getElementById('not_part_of_group_status') != null || document.getElementById('not_part_of_group_status') != undefined)
+          chat_body.removeChild(document.getElementById('not_part_of_group_status'));
+        chat_body.innerHTML += "<center style='color : green'><b>You joined the group ...</b></center>";
+
+        var other_groups = document.getElementById('other_groups');
+        other_groups.removeChild(document.getElementById(data.group_name+':group'));
+
+        var my_groups = document.getElementById('my_groups');
+        var a = document.createElement('a');
+        a.setAttribute('href', '#');
+        // a.setAttribute('class', 'my_groups_link');
+        a.setAttribute('id', data.group_name+':group');
+        a.addEventListener('click', my_group_chat1);
+        a.style.textDecoration = 'none';
+        var div = document.createElement('div');
+        div.setAttribute('class', 'my_groups_div');
+
+        var p = document.createElement('p');
+        var b = document.createElement('b');
+        b.textContent = data.group_name;
+        p.appendChild(b); 
+        div.appendChild(p);
+        a.appendChild(div);
+        my_groups.appendChild(a);
+
+        document.getElementById('message').removeAttribute('disabled');
+      }
+      else
+      {
+        console.log('Unable to join the group');
+        alert('some error occurred in the server...\nPlease try again later.');
+      }
+    });
+
+    // to handle the response sent by the server when the user requested to send the messages corresponding to a group
+    socket.on('getGroupMessages_reply', function(x){
+      console.log('in getGroupMessages_reply');
+      x = x.data[0].messages;
+      var chat_body = document.getElementById('chat_body');
+      chat_body.innerHTML = "";
+      console.log('length of group messages received from the server is ', x.length);
+      if(x.length == 0)
+      {
+        chat_body.innerHTML = "<p id='no_messages_status' style='text-align:center; margin :28%'><b>No messages ! <br>Be the first one to start the conversation ... </b></p>";
+      }
+      else
+      {
+        var my_name = document.getElementById('my_name').textContent.trim();
+        for(var i=0; i<x.length; i++)
+        {
+          if(x[i].from == my_name)
+          {
+            var div = document.createElement('div');
+            div.setAttribute('class', 'my_message');
+
+            var pre = document.createElement('pre');
+            pre.setAttribute('class', 'pre');
+            pre.style.border='0px';
+            div.appendChild(pre);
+            
+            var span1 = document.createElement('span');
+            span1.textContent = 'Me';
+            span1.style.fontWeight = 'bold';
+            pre.appendChild(span1);
+            var br = document.createElement('br');
+            pre.appendChild(br);
+            var span2 = document.createElement('span');
+            span2.textContent = x[i].message_content;
+            pre.appendChild(span2);
+    
+            chat_body.appendChild(div);
+            chat_body.scrollTop = chat_body.scrollHeight;
+          }
+          else
+          {
+            var div = document.createElement('div');
+            div.setAttribute('class', 'message');
+
+            var pre = document.createElement('pre');
+            pre.setAttribute('class', 'pre');
+            pre.style.border='0px';
+            div.appendChild(pre);
+            
+            var span1 = document.createElement('span');
+            span1.textContent = x[i].from;
+            span1.style.fontWeight = 'bold';
+            pre.appendChild(span1);
+            var br = document.createElement('br');
+            pre.appendChild(br);
+            var span2 = document.createElement('span');
+            span2.textContent = x[i].message_content;
+            pre.appendChild(span2);
+    
+            chat_body.appendChild(div);
+            chat_body.scrollTop = chat_body.scrollHeight;
+          }
+        }
+      }
+    });
+
+    // to clear the modal when it is closed
+    $("#create_group_modal").on('hidden.bs.modal', function () {
+      document.getElementById('group_status').textContent="";
+      document.getElementById('group_name_modal').value ="";
+    });
+  });
+
+    // this function will be invoked when the user clicks on create button present in the modal
+    function createGroup()
+    {
+      var group_name = document.getElementById('group_name_modal').value;
+      group_name = group_name.trim();
+      console.log('in function');
+      if(group_name != null || group_name != undefined || group_name != "")
+      {
+        temp_socket.emit('create_group', {group_name : group_name});
+        console.log('request sent to the server to create a group');
+        return false;
+      }
+      else
+      {
+        console.log('enter a valid group name');
+        return false;
+      }
+    }
+
+    // this function will be invoked when the user clicks on any link in my_groups
+    function my_group_chat(element)
+    {
+      console.log('in my_group_chat');
+      console.log('the element is ', element);
+      var chat_heading = document.getElementById('chat_heading');
+      var chat_body = document.getElementById('chat_body');
+
+      var group_name = element.getAttribute('id').trim();
+      group_name = group_name.split(':');
+      group_name = group_name[0];
+      console.log('group name is ', group_name);
+      chat_heading.textContent = group_name;
+      chat_body.innerHTML = "";
+      chat_body.innerHTML =  "<center><i class='fa fa-circle-o-notch fa-pulse fa-1x fa-fw' style='margin:28%'></center>";
+      var message = document.getElementById('message');
+      message.removeAttribute('disabled');
+      temp_socket.emit('getMessages', {type : 'group', name : group_name});
+      var chat_identity = document.getElementById('chat_identity');
+      chat_identity.value = 'group';
+      console.log('chat identity is ', chat_identity.value);
+    }
+
+    function my_group_chat1(event)
+    {
+      var element = event.currentTarget;
+      console.log('in my_group_chat');
+      console.log('the element is ', element);
+      var chat_heading = document.getElementById('chat_heading');
+      var chat_body = document.getElementById('chat_body');
+
+      var group_name = element.getAttribute('id').trim();
+      group_name = group_name.split(':');
+      group_name = group_name[0];
+      console.log('group name is ', group_name);
+      chat_heading.textContent = group_name;
+      chat_body.innerHTML = "";
+      chat_body.innerHTML =  "<center><i class='fa fa-circle-o-notch fa-pulse fa-1x fa-fw' style='margin:28%'></center>";
+      var message = document.getElementById('message');
+      message.removeAttribute('disabled');
+      temp_socket.emit('getMessages', {type : 'group', name : group_name});
+      var chat_identity = document.getElementById('chat_identity');
+      chat_identity.value = 'group';
+      console.log('chat identity is ', chat_identity.value);
+    }
+
+    function other_group_chat(element)
+    {
+      console.log('in other_group_chat');
+      console.log('the element is ', element);
+      var chat_heading = document.getElementById('chat_heading');
+      var chat_body = document.getElementById('chat_body');
+
+      var group_name = element.getAttribute('id').trim();
+      group_name = group_name.split(':');
+      group_name = group_name[0];
+      console.log('group name is ', group_name);
+      chat_heading.textContent = group_name;
+      chat_body.innerHTML = "";
+      chat_body.innerHTML = "<center style='margin-top:23%' id='not_part_of_group_status'><span>You are not a part of this group ...<br>Please click on join button to join this group ...<br><button type='button' class='btn btn-primary' style='border-radius:0px;margin-top: 5px' onclick='join_the_group()'>Join the group</button></span></center>";
+      var chat_identity = document.getElementById('chat_identity');
+      var message = document.getElementById('message');
+      message.setAttribute('disabled','disabled');
+      chat_identity.value = 'group';
+      console.log('chat identity is ', chat_identity.value);
+    }
+
+    function other_group_chat1(event)
+    {
+      var element = event.currentTarget;
+      console.log('in other_group_chat');
+      console.log('the element is ', element);
+      var chat_heading = document.getElementById('chat_heading');
+      var chat_body = document.getElementById('chat_body');
+
+      var group_name = element.getAttribute('id').trim();
+      group_name = group_name.split(':');
+      group_name = group_name[0];
+      console.log('group name is ', group_name);
+      chat_heading.textContent = group_name;
+      chat_body.innerHTML = "";
+      chat_body.innerHTML = "<center style='margin-top:23%' id='not_part_of_group_status'><span>You are not a part of this group ...<br>Please click on join button to join this group ...<br><button type='button' class='btn btn-primary' style='border-radius:0px;margin-top: 5px' onclick='join_the_group()'>Join the group</button></span></center>";
+      var chat_identity = document.getElementById('chat_identity');
+      var message = document.getElementById('message');
+      message.setAttribute('disabled','disabled');
+      chat_identity.value = 'group';
+      console.log('chat identity is ', chat_identity.value);
+    }
+
+    // this function will be invoked when user clicks on any link present in third panel i.e. personal chat with someone
+    function personal_chat(event)
+    {
+      console.log('in personal_chat');
+      var element = event.currentTarget;
+      var name = element.getAttribute('id');
+      document.getElementById('chat_heading').textContent = name;
+      var chat_body = document.getElementById('chat_body');
+      // var chat_identity = document.getElementById('chat_identity');
+      // chat_identity.textContent = 'personal';
+      // console.log('chat identity is ', chat_identity.textContent);
+      chat_body.innerHTML += "<center><i class='fa fa-circle-o-notch fa-pulse fa-1x fa-fw' style='margin:28%'></center>";
+      temp_socket.emit('getMessages', {type : 'personal', name : name});
+      var chat_identity = document.getElementById('chat_identity');
+      chat_identity.value = 'personal';
+      console.log('chat identity is ', chat_identity.value);
+    }
+
+    // to update the notification body 
+    function update_notification_body(event)
+    {
+      var ele = event.currentTarget;
+      var notification_body = document.getElementById('notification_body');
+      var chat_heading = document.getElementById('chat_heading');
+      var chat_body = document.getElementById('chat_body');
+
+      var notification_count = parseInt(document.getElementById('notification_count').textContent);
+
+      var id = ele.getAttribute('id').trim();
+      id = id.split(':');
+      var y = id[2];
+      console.log('check is ', y);
+      id = id[0];
+      console.log('id is ', id);
+      var items = document.getElementsByClassName(id);
+
+      notification_count = notification_count - items.length;
+      console.log('new notification count is ', notification_count);
+
+      $('#notification_body .'+id).remove();
+      document.getElementById('notification_count').textContent = notification_count;
+      chat_heading.textContent = id;
+      chat_body.innerHTML = "";
+      chat_body.innerHTML = "<center><i class='fa fa-circle-o-notch fa-pulse fa-1x fa-fw' style='margin:28%'></center>";
+      var chat_identity = document.getElementById('chat_identity');
+      chat_identity.value = y;
+      temp_socket.emit('getMessages', {type : y, name : id});
+
+      var message = document.getElementById('message');
+      message.removeAttribute('disabled');
+    }
+
+    function join_the_group()
+    {
+      var chat_heading = document.getElementById('chat_heading');
+      console.log('group name is ', chat_heading.textContent);
+      temp_socket.emit('join_group', { group_name : chat_heading.textContent.trim() });
+    }
+
+    // to handle the event which is fired when user clicks on send button i.e. to send a personal message
+    function send_message()
+    {
+      var ele = document.getElementById('message');
+      var obj = {};
+      obj.from = document.getElementById('my_name').textContent.trim();
+      obj.to = document.getElementById('chat_heading').textContent.trim();
+      obj.message_content = ele.value.trim();
+      ele.value="";
+      console.log('message is ', obj);
+      console.log('conenction test ', temp_socket.connected);
+      if(temp_socket.connected == true)
+      {
+        if(document.getElementById('no_messages_status') != null)
+        document.getElementById('no_messages_status').style.display = 'none';
+        if(document.getElementById('chat_identity').value == 'personal')
+        {
+          console.log('chat identity value is ', document.getElementById('chat_identity').value);
+          var div = document.createElement('div');
+          div.setAttribute('class', 'my_message');
+
+          var pre = document.createElement('pre');
+          pre.setAttribute('class', 'pre');
+          pre.style.border='0px';
+          div.appendChild(pre);
+
+          var span1 = document.createElement('span');
+          span1.textContent = obj.message_content;
+          pre.appendChild(span1);
+       
+          chat_body.appendChild(div);
+          chat_body.scrollTop = chat_body.scrollHeight;
+          temp_socket.emit('newPersonalMessage', {message : obj});
+          return false;
+        }
+        else
+        {
+          console.log('chat identity value is ', document.getElementById('chat_identity').value);
+          var div = document.createElement('div');
+          div.setAttribute('class', 'my_message');
+
+          var pre = document.createElement('pre');
+          pre.setAttribute('class', 'pre');
+          pre.style.border='0px';
+          div.appendChild(pre);
+
+          var span1 = document.createElement('span');
+          span1.textContent = 'Me';
+          span1.style.fontWeight = 'bold';
+          pre.appendChild(span1);
+
+          var br = document.createElement('br');
+          pre.appendChild(br);
+
+          var span2 = document.createElement('span');
+          span2.textContent = obj.message_content;
+          pre.appendChild(span2);
+       
+          chat_body.appendChild(div);
+          chat_body.scrollTop = chat_body.scrollHeight;
+          temp_socket.emit('newGroupMessage', {message : obj});
+          return false;
+        }
+        
+      }
+      else
+      {
+        alert('Please check your internet connection ...');
+        return false;
+      }
+    }
+</script>
+</html>

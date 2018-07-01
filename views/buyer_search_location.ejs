@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+      
+  </head>
+  <body>
+  <form id='locality-form' method='POST' action="/buyer_chat_room">
+    <select name="city" id="city">
+      <%
+        for ( var i = 0; i < r.length; i++ ) {%>
+            <option value="<%=r[ i ] %>"> <%=r[ i ] %> </option>
+      <%}%>
+    </select>
+    <br><br>
+    <select name="locality" id="locality">
+      <option disabled="disabled" selected="selected">select a locality</option>  
+    </select>
+    <br><br>
+    <input type="submit" name="Search">
+  </form>
+
+  </body>
+  <script>
+      document.getElementById('city').addEventListener('change', function(event){
+        var city= document.getElementById('city').value;
+        console.log('change identified');
+        var xhttp;
+        if (window.XMLHttpRequest) {
+            xhttp = new XMLHttpRequest();
+        } else {
+            xhttp = new ActiveXObject("Microsoft.XMLHTTP");
+        }
+        xhttp.open("GET", "/localities/"+ city, true);
+        xhttp.send();
+        xhttp.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                console.log('response is ', JSON.parse(this.responseText));
+                var data= JSON.parse(this.responseText).localities[0].localities;
+                var temp="";
+                for(var i=0; i<data.length;i++){
+                  temp+= "<option value="+ data[i] +">"+ data[i] +"</option>"
+                }
+                document.getElementById('locality').innerHTML= "";
+                document.getElementById('locality').innerHTML+=temp;
+          }
+        };
+      });
+    </script>
+</html>

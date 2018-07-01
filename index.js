@@ -53,6 +53,8 @@ require('./controllers/basic_controller.js')(app);
 
 require('./controllers/home_controller.js')(app);
 
+require('./controllers/property_controller.js')(app);
+
 io.on('connection', function(socket){
 	console.log('one connection established ', socket.id);
 	socket.handshake.session.socket_id = socket.id;
@@ -64,9 +66,9 @@ io.on('connection', function(socket){
 		socket.join(rooms[i]);
 		console.log(socket.id, ' joined the room ', rooms[i]);
 	}
+
 	var socket_data_model = require('./schemas/socket_data_schema.js');
 	var data = {};
-	data._id = new Date().getTime();
 	data.user_name = socket.handshake.session.user_name;
 	data.socket_id = socket.id;
 	socket_data_model.findOne({user_name : data.user_name}, function(error, result){

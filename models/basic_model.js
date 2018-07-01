@@ -2,7 +2,12 @@ module.exports = function(){
 	return {
 		login_check : function(data, request, response){
 			console.log('in basic_model.js login_check()');
-			var users_model = require('../schemas/users_schema.js');
+			var users_model;
+			if(request.body.member == 'dealer')
+				users_model= require('../schemas/dealer_schema.js');
+			if(request.body.member == 'buyer')
+				users_model= require('../schemas/buyer_schema.js');
+
 			users_model.findOne({user_name : data.user_name}, function(error, result){
 				if(error)
 				{
@@ -26,6 +31,7 @@ module.exports = function(){
 							{
 								console.log('login successful ');
 								request.session.user_name = data.user_name;
+								request.session.member= request.body.member;
 								response.redirect('/home');
 							}
 							else
@@ -39,16 +45,30 @@ module.exports = function(){
 			});
 		},
 
-		register : function(data, request, response){
+		register : function(request, response){
+			var data= request.body;
 			console.log('in basic_model.js register()');
 			console.log('data in model is ', data);
-			var users_model = require('../schemas/users_schema.js');
-			users_model.findOne({user_name : data.user_name}, function(error, result){
+			var member_model;
+			if(data.member == 'dealer')
+			{
+				member_model= require('../schemas/dealer_schema.js');
+			}
+			if(data.member == 'buyer')
+			{
+				member_model= require('../schemas/buyer_schema.js');
+			}
+			var member= data.member;
+			delete data.member;
+			member_model.findOne({user_name : data.user_name}, function(error, result){
 				if(error)
 				{
-					console.log('some error occurred while checking for the existence of the user_name ', error);
+					console.log('error occurred while checking for the existence of user_name ', error);
 					response.status(500);
-					response.render('../views/register', {message : 'Some Internal error occurred !'});
+					response.json({
+						success: false,
+						message: 'some internal error  occurred !'
+					});
 				}
 				else
 				{
@@ -60,24 +80,34 @@ module.exports = function(){
 							{
 								console.log('some error occurred while generating the hash ', err);
 								response.status(500);
-								response.render('../views/register', {message : 'Some Internal error occurred !'});
+								response.json({
+									success: false,
+									message: 'some internal error  occurred !'
+								});
 							}
 							else
 							{
 								data.password = hash;
-								users_model.create(data, function(e, r){
+								member_model.create(data, function(e, r){
 									if(e)
 									{
-										console.log('some error occurred while inserting the document ', error);
+										console.log('some error occurred while inserting the document ', e);
 										response.status(500);
-										response.render('../views/register', {message : 'Some Internal error occurred !'});
+										response.json({
+											success: false
+										});
 									}
 									else
 									{
 										console.log('registration successful');
+
 										request.session.user_name = data.user_name;
+										request.session.member= member;
+										console.log('session data is ', request.session);
 										response.status(200);
-										response.redirect('/home');
+										response.json({
+											success: true
+										});
 									}
 								});
 							}
@@ -87,7 +117,10 @@ module.exports = function(){
 					{
 						console.log('Username already exists !');
 						response.status(200);
-						response.render('../views/register', {message : 'Username already exists !'});
+						response.json({
+							success: false,
+							message: 'Username already exists !'
+						});
 					}
 				}
 			});	
